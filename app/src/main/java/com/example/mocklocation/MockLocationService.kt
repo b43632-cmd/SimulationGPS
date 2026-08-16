@@ -72,7 +72,7 @@ class MockLocationService : Service() {
         if (!setupMockProvider()) {
             val handler = android.os.Handler(android.os.Looper.getMainLooper())
             handler.post {
-                android.widget.Toast.makeText(applicationContext, "請先在「開發人員選項」中將此APP設為「模擬位置應用程式」", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(applicationContext, "請確認已在開發人員選項設定本APP，且手機的「定位服務(GPS)」已開啟！", android.widget.Toast.LENGTH_LONG).show()
             }
             stopSelf()
             return START_NOT_STICKY
@@ -128,12 +128,12 @@ class MockLocationService : Service() {
         isMocking = true
         mockThread = Thread {
             while (isMocking) {
-                try {
-                    val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-                    val currentTime = System.currentTimeMillis()
-                    val currentRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+                val currentTime = System.currentTimeMillis()
+                val currentRealtimeNanos = SystemClock.elapsedRealtimeNanos()
 
-                    for (provider in providers) {
+                for (provider in providers) {
+                    try {
                         val mockLocation = Location(provider).apply {
                             latitude = targetLat
                             longitude = targetLng
@@ -146,12 +146,18 @@ class MockLocationService : Service() {
                         // 推播假座標
                         locationManager.setTestProviderLocation(provider, mockLocation)
                         Log.d(TAG, "Pushing mock location to $provider: $targetLat, $targetLng")
+                    } catch (e: IllegalArgumentException) {
+                        // 當此 Provider 未成功加入 test provider 時會拋出 IllegalArgumentException，忽略即可
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error pushing mock location to $provider: ${e.message}")
                     }
+                }
 
+                try {
                     // 暫停 1 秒
                     Thread.sleep(1000)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error pushing mock location: ${e.message}")
+                } catch (e: InterruptedException) {
+                    Log.d(TAG, "Mocking thread interrupted")
                     break
                 }
             }
