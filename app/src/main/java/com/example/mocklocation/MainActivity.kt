@@ -62,9 +62,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
 
-        // 預設視角設定在台北 101
-        val taipei101 = LatLng(25.033964, 121.564468)
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(taipei101, 15f))
+        // 預設視角設定在使用者的指定位置
+        val defaultLocation = LatLng(22.730522, 120.321092)
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, 15f))
 
         // 點擊地圖時放置或移動 Marker，並記錄經緯度
         map.setOnMapClickListener { latLng ->

@@ -71,11 +71,14 @@ class MockLocationService : Service() {
         // 設定 Test Provider
         setupMockProvider()
 
+        // 先停止之前的推播，避免 Thread leak
+        stopMockingThread()
+
         // 啟動每秒一次的推播執行緒
         startMockingThread()
 
-        // 如果 Service 被系統殺掉，會嘗試重啟 (傳入 null Intent)
-        return START_STICKY
+        // 使用 START_REDELIVER_INTENT 確保重啟時能收到先前的 Intent 與座標
+        return START_REDELIVER_INTENT
     }
 
     private fun setupMockProvider() {
@@ -133,14 +136,21 @@ class MockLocationService : Service() {
         mockThread?.start()
     }
 
+    private fun stopMockingThread() {
+        if (isMocking || mockThread != null) {
+            Log.d(TAG, "stopMockingThread: 停止先前的推播迴圈")
+            isMocking = false
+            mockThread?.interrupt()
+            mockThread = null
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy: 停止 Mock Location")
 
         // 停止推播迴圈
-        isMocking = false
-        mockThread?.interrupt()
-        mockThread = null
+        stopMockingThread()
 
         // 必須確實呼叫 removeTestProvider 釋放 Provider，恢復真實 GPS
         try {
