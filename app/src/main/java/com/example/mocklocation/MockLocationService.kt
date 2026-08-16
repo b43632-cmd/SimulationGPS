@@ -89,10 +89,11 @@ class MockLocationService : Service() {
     }
 
     private fun setupMockProvider(): Boolean {
-        return try {
-            val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        var hasSuccessfulProvider = false
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
 
-            for (provider in providers) {
+        for (provider in providers) {
+            try {
                 try {
                     locationManager.removeTestProvider(provider)
                 } catch (e: Exception) {
@@ -106,15 +107,21 @@ class MockLocationService : Service() {
                 )
                 locationManager.setTestProviderEnabled(provider, true)
                 Log.d(TAG, "Test provider ($provider) added and enabled.")
+                hasSuccessfulProvider = true
+            } catch (e: SecurityException) {
+                // 部分裝置的 NETWORK_PROVIDER 會強制拋出 SecurityException，即使設定了模擬位置也一樣
+                // 我們不應該立刻 return false，而是跳過該 Provider 繼續嘗試其他的 (例如 GPS_PROVIDER)
+                Log.e(TAG, "SecurityException for $provider: 嘗試加入 Provider 失敗，可能裝置或該 Provider 不允許", e)
+            } catch (e: IllegalArgumentException) {
+                // 有些裝置可能不支援 NETWORK_PROVIDER，此時會拋出 IllegalArgumentException，不該讓整個服務崩潰
+                Log.w(TAG, "IllegalArgumentException: 無法加入 Provider $provider，可能裝置不支援", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "未知的錯誤發生在加入 Provider $provider 時", e)
             }
-            true
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException: 尚未在開發者選項中將此App設為模擬位置應用程式", e)
-            false
-        } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "IllegalArgumentException: Provider 已經存在或其他參數錯誤", e)
-            false
         }
+
+        // 只要有任何一個 Provider (例如 GPS) 成功加入，就視為成功
+        return hasSuccessfulProvider
     }
 
     private fun startMockingThread() {
