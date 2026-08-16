@@ -68,8 +68,15 @@ class MockLocationService : Service() {
 
         startForeground(NOTIFICATION_ID, notification)
 
-        // 設定 Test Provider
-        setupMockProvider()
+        // 設定 Test Provider，如果失敗則停止服務並提示使用者
+        if (!setupMockProvider()) {
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            handler.post {
+                android.widget.Toast.makeText(applicationContext, "請先在「開發人員選項」中將此APP設為「模擬位置應用程式」", android.widget.Toast.LENGTH_LONG).show()
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         // 先停止之前的推播，避免 Thread leak
         stopMockingThread()
@@ -81,29 +88,32 @@ class MockLocationService : Service() {
         return START_REDELIVER_INTENT
     }
 
-    private fun setupMockProvider() {
-        try {
-            // 如果 provider 已存在先移除再加入 (避免之前的異常狀態)
-            try {
-                locationManager.removeTestProvider(providerName)
-            } catch (e: Exception) {
-                // provider 不存在，忽略
-            }
+    private fun setupMockProvider(): Boolean {
+        return try {
+            val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
 
-            // 加入 Test Provider
-            // Android 12 (API 31)+ 之後可以使用 createProviderPropertiesBuilder 等
-            // 這裡為了向下相容至 API 21+ 通常需給定各種布林值與精確度
-            locationManager.addTestProvider(
-                providerName,
-                false, false, false, false, true,
-                true, true, 0, 5
-            )
-            locationManager.setTestProviderEnabled(providerName, true)
-            Log.d(TAG, "Test provider ($providerName) added and enabled.")
+            for (provider in providers) {
+                try {
+                    locationManager.removeTestProvider(provider)
+                } catch (e: Exception) {
+                    // provider 不存在，忽略
+                }
+
+                locationManager.addTestProvider(
+                    provider,
+                    false, false, false, false, true,
+                    true, true, 0, 5
+                )
+                locationManager.setTestProviderEnabled(provider, true)
+                Log.d(TAG, "Test provider ($provider) added and enabled.")
+            }
+            true
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException: 尚未在開發者選項中將此App設為模擬位置應用程式", e)
+            false
         } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "IllegalArgumentException: Provider '$providerName' 已經存在或其他參數錯誤", e)
+            Log.e(TAG, "IllegalArgumentException: Provider 已經存在或其他參數錯誤", e)
+            false
         }
     }
 
@@ -112,18 +122,24 @@ class MockLocationService : Service() {
         mockThread = Thread {
             while (isMocking) {
                 try {
-                    val mockLocation = Location(providerName).apply {
-                        latitude = targetLat
-                        longitude = targetLng
-                        altitude = 0.0
-                        time = System.currentTimeMillis()
-                        accuracy = 1f // 高精確度
-                        elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
-                    }
+                    val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+                    val currentTime = System.currentTimeMillis()
+                    val currentRealtimeNanos = SystemClock.elapsedRealtimeNanos()
 
-                    // 推播假座標
-                    locationManager.setTestProviderLocation(providerName, mockLocation)
-                    Log.d(TAG, "Pushing mock location: $targetLat, $targetLng")
+                    for (provider in providers) {
+                        val mockLocation = Location(provider).apply {
+                            latitude = targetLat
+                            longitude = targetLng
+                            altitude = 0.0
+                            time = currentTime
+                            accuracy = 1f // 高精確度
+                            elapsedRealtimeNanos = currentRealtimeNanos
+                        }
+
+                        // 推播假座標
+                        locationManager.setTestProviderLocation(provider, mockLocation)
+                        Log.d(TAG, "Pushing mock location to $provider: $targetLat, $targetLng")
+                    }
 
                     // 暫停 1 秒
                     Thread.sleep(1000)
@@ -154,8 +170,11 @@ class MockLocationService : Service() {
 
         // 必須確實呼叫 removeTestProvider 釋放 Provider，恢復真實 GPS
         try {
-            locationManager.removeTestProvider(providerName)
-            Log.d(TAG, "Test provider removed. Real GPS restored.")
+            val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            for (provider in providers) {
+                locationManager.removeTestProvider(provider)
+                Log.d(TAG, "Test provider $provider removed. Real location restored.")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error removing test provider: ${e.message}")
         }
