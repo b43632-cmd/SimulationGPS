@@ -90,7 +90,8 @@ class MockLocationService : Service() {
 
     private fun setupMockProvider(): Boolean {
         var hasSuccessfulProvider = false
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        // 加入 "fused" provider 才能成功騙過 Google Maps 與依賴 Play Services 的現代 APP
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused")
 
         for (provider in providers) {
             try {
@@ -103,7 +104,7 @@ class MockLocationService : Service() {
                 locationManager.addTestProvider(
                     provider,
                     false, false, false, false, true,
-                    true, true, 0, 5
+                    true, true, android.location.Criteria.POWER_LOW, android.location.Criteria.ACCURACY_FINE
                 )
                 locationManager.setTestProviderEnabled(provider, true)
                 Log.d(TAG, "Test provider ($provider) added and enabled.")
@@ -128,7 +129,7 @@ class MockLocationService : Service() {
         isMocking = true
         mockThread = Thread {
             while (isMocking) {
-                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused")
                 val currentTime = System.currentTimeMillis()
                 val currentRealtimeNanos = SystemClock.elapsedRealtimeNanos()
 
@@ -138,6 +139,8 @@ class MockLocationService : Service() {
                             latitude = targetLat
                             longitude = targetLng
                             altitude = 0.0
+                            speed = 0f
+                            bearing = 0f
                             time = currentTime
                             accuracy = 1f // 高精確度
                             elapsedRealtimeNanos = currentRealtimeNanos
@@ -183,7 +186,7 @@ class MockLocationService : Service() {
 
         // 必須確實呼叫 removeTestProvider 釋放 Provider，恢復真實 GPS
         try {
-            val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused")
             for (provider in providers) {
                 locationManager.removeTestProvider(provider)
                 Log.d(TAG, "Test provider $provider removed. Real location restored.")
