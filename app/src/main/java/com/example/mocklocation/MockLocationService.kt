@@ -142,8 +142,14 @@ class MockLocationService : Service() {
                             speed = 0f
                             bearing = 0f
                             time = currentTime
-                            accuracy = 1f // 高精確度
+                            accuracy = 3.0f // 設定一個比較真實的精確度 (3公尺)
                             elapsedRealtimeNanos = currentRealtimeNanos
+
+                            // 嚴格的打卡系統會檢查 GPS 衛星數量，如果沒有這包資料會被判定為「無法取得GPS訊號」
+                            val bundle = android.os.Bundle()
+                            bundle.putInt("satellites", 12)
+                            bundle.putInt("satellitesInView", 15)
+                            extras = bundle
                         }
 
                         // 推播假座標
