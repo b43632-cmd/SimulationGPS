@@ -2,4 +2,8 @@
     <string name="app_name">MockLocationApp</string>
     <string name="start_mock">開始打卡定位</string>
     <string name="stop_mock">停止定位</string>
+    <string name="location_name_hint">地點名稱</string>
+    <string name="latitude_hint">緯度 (Latitude)</string>
+    <string name="longitude_hint">經度 (Longitude)</string>
+    <string name="save_location">儲存</string>
 </resources>
